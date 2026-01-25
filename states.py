@@ -3,6 +3,8 @@ import random
 from shared_data import *
 from entities import *
 from enemies import *
+from visuals import ParticleSystem
+
 
 class GameState:
     def __init__(self, game):
@@ -148,7 +150,8 @@ class MapState(GameState):
                     target_planet = self.planetas[self.selected_index]
                     contexto.planeta_actual = target_planet["nombre"]
                     sound_manager.play('select')
-                    self.next_state = SpaceTravelState(self.game, target_planet)
+                    # Ir a pantalla de información primero
+                    self.next_state = PlanetInfoState(self.game, target_planet)
 
     def update(self):
         pass
@@ -178,6 +181,55 @@ class MapState(GameState):
             # Nombre
             txt = self.font_ui.render(p["nombre"], True, BLANCO)
             screen.blit(txt, (p["x"] - txt.get_width()//2, p["y"] + p["r"] + 10))
+
+
+class PlanetInfoState(GameState):
+    def __init__(self, game, planet_data):
+        super().__init__(game)
+        self.planet_data = planet_data
+        self.font_title = pygame.font.SysFont("Arial", 40)
+        self.font_text = pygame.font.SysFont("Arial", 24)
+        self.font_small = pygame.font.SysFont("Arial", 20)
+        
+        # Datos ficticios por ahora basada en el nombre
+        name = planet_data["nombre"]
+        self.info = {
+            "Mercurio": ["Temperatura: 430°C", "Gravedad: 3.7 m/s²", "Atmósfera: Inexistente", "Peligro: Radiación Solar"],
+            "Venus": ["Temperatura: 462°C", "Gravedad: 8.87 m/s²", "Atmósfera: Tóxica (CO2)", "Peligro: Lluvia Ácida"],
+            "Tierra": ["Temperatura: 15°C", "Gravedad: 9.8 m/s²", "Atmósfera: Respirable", "Peligro: Humanos"],
+            "Marte": ["Temperatura: -63°C", "Gravedad: 3.71 m/s²", "Atmósfera: Tenue (CO2)", "Peligro: Tormentas de Polvo"],
+            "Júpiter": ["Temperatura: -108°C", "Gravedad: 24.79 m/s²", "Atmósfera: Tormentosa", "Peligro: Gran Mancha Roja"],
+            "Saturno": ["Temperatura: -139°C", "Gravedad: 10.44 m/s²", "Atmósfera: Hidrógeno/Helio", "Peligro: Anillos de Hielo"]
+        }
+        self.lines = self.info.get(name, ["Datos no disponibles"])
+
+    def handle_events(self, events):
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    sound_manager.play('select')
+                    self.next_state = SpaceTravelState(self.game, self.planet_data)
+
+    def draw(self, screen):
+        screen.fill(NEGRO)
+        
+        # Título
+        name = self.planet_data["nombre"]
+        title = self.font_title.render(f"DESTINO: {name.upper()}", True, self.planet_data["color"])
+        screen.blit(title, (ANCHO//2 - title.get_width()//2, 100))
+        
+        # Dibujar Planeta Grande
+        pygame.draw.circle(screen, self.planet_data["color"], (ANCHO//2, 250), 60)
+        
+        # Mostrar Info
+        start_y = 350
+        for i, line in enumerate(self.lines):
+            txt = self.font_text.render(line, True, BLANCO)
+            screen.blit(txt, (ANCHO//2 - txt.get_width()//2, start_y + i * 35))
+            
+        # Instrucción
+        instr = self.font_small.render("Presiona ENTER para iniciar el viaje", True, VERDE)
+        screen.blit(instr, (ANCHO//2 - instr.get_width()//2, ALTO - 100))
 
 
 class SpaceTravelState(GameState):
@@ -213,6 +265,10 @@ class SpaceTravelState(GameState):
                 self.stars.append([random.randrange(ANCHO), random.randrange(ALTO), random.randrange(1, 4)]) # x, y, speed
 
         self.font_hud = pygame.font.SysFont("Arial", 20)
+        
+        # Sistema de partículas
+        self.particle_system = ParticleSystem()
+
 
     def handle_events(self, events):
         for event in events:
@@ -241,8 +297,8 @@ class SpaceTravelState(GameState):
         # Timer
         self.timer_frames -= 1
         if self.timer_frames <= 0:
-            # LLegada al planeta
-            self.next_state = PlanetState(self.game)
+            # LLegada al planeta -> Landing
+            self.next_state = LandingState(self.game)
             return
 
         # Scroll estrellas (solo si no hay bg)
@@ -259,12 +315,25 @@ class SpaceTravelState(GameState):
             self.all_sprites.add(enemy)
             self.enemigos.add(enemy)
 
+        # Partículas de motor
+        self.particle_system.create_thruster_trail(self.nave.rect.centerx, self.nave.rect.bottom)
+        if contexto.ship_type == "heavy": # Motores extra
+             self.particle_system.create_thruster_trail(self.nave.rect.left + 5, self.nave.rect.bottom - 5)
+             self.particle_system.create_thruster_trail(self.nave.rect.right - 5, self.nave.rect.bottom - 5)
+             
+        # Partículas para balas
+        for b in self.balas:
+            self.particle_system.create_bullet_trail(b.rect.centerx, b.rect.bottom)
+
+        self.particle_system.update()
+
         self.all_sprites.update()
         
         # Colisiones: Balas vs Enemigos
         hits = pygame.sprite.groupcollide(self.enemigos, self.balas, True, True)
         for hit in hits:
             sound_manager.play('explosion')
+            self.particle_system.create_explosion(hit.rect.centerx, hit.rect.centery)
             contexto.puntuacion += 10
             
         # Colisiones: Nave vs Enemigos
@@ -287,6 +356,7 @@ class SpaceTravelState(GameState):
             for s in self.stars:
                 pygame.draw.circle(screen, (200, 200, 255), (s[0], s[1]), 2)
             
+        self.particle_system.draw(screen)
         self.all_sprites.draw(screen)
         
         # HUD
@@ -302,6 +372,54 @@ class SpaceTravelState(GameState):
         score_surf = self.font_hud.render(score_text, True, BLANCO)
         screen.blit(score_surf, (10, ALTO - 30))
 
+class LandingState(GameState):
+    def __init__(self, game):
+        super().__init__(game)
+        # Piloto cayendo
+        self.piloto = pygame.transform.scale(pygame.Surface((30, 50)), (30, 50))
+        self.piloto.fill(ROJO)
+        
+        self.y = -50
+        self.target_y = ALTO - 100
+        self.speed = 4
+        
+        # Fondo simple (cielo del planeta)
+        self.bg_color = (135, 206, 235) # SkyBlue por defecto
+        
+        # Partículas
+        self.particle_system = ParticleSystem()
+        
+        self.font = pygame.font.SysFont("Arial", 40)
+    
+    def handle_events(self, events):
+        pass # No interacción, es cutscene
+        
+    def update(self):
+        self.y += self.speed
+        
+        # Partículas de propulsión de aterrizaje
+        self.particle_system.create_thruster_trail(ANCHO//2, self.y + 50)
+        self.particle_system.update()
+
+        if self.y >= self.target_y:
+            # Aterrizaje completo
+            sound_manager.play('jump') # Sonido de impacto suave
+            self.particle_system.create_explosion(ANCHO//2, self.y + 50, color=(200, 200, 200)) # Polvo
+            pygame.time.delay(500) # Pequeña pausa
+            self.next_state = PlanetState(self.game)
+
+    def draw(self, screen):
+        screen.fill(self.bg_color)
+        
+        # Texto Descenso
+        txt = self.font.render("ATERRIZANDO...", True, BLANCO)
+        screen.blit(txt, (ANCHO//2 - txt.get_width()//2, ALTO//2))
+        
+        # Dibujar piloto
+        screen.blit(self.piloto, (ANCHO//2 - 15, self.y))
+        
+        self.particle_system.draw(screen)
+
 class PlanetState(GameState):
     def __init__(self, game):
         super().__init__(game)
@@ -309,6 +427,15 @@ class PlanetState(GameState):
         self.all_sprites = pygame.sprite.Group(self.piloto)
         self.plataformas = pygame.sprite.Group()
         self.balas = pygame.sprite.Group()
+        
+        # Boss initialization
+        self.boss = None
+        self.boss_defeated = False
+        self.balas_boss = pygame.sprite.Group()
+        
+        # Timer: 3 minutos = 180 segundos
+        self.total_time = 180 
+        self.timer_frames = self.total_time * FPS
         
         # Configuración de temas por planeta
         self.bg_color = (20, 20, 40) # Default
@@ -345,18 +472,9 @@ class PlanetState(GameState):
         self.all_sprites.add(suelo, plat1, plat2)
         self.plataformas.add(suelo, plat1, plat2)
         
-        # Spawn Enemigos
-        e1 = GroundEnemy(300, 400, range_x=100) # En plat1
-        e2 = GroundEnemy(600, ALTO - 40, range_x=200) # En el suelo
-        self.ground_enemies.add(e1, e2)
-        self.all_sprites.add(e1, e2)
-        
-        # Spawn Coleccionables
-        c1 = Collectible(250, 380, "coin")
-        c2 = Collectible(600, 230, "health")
-        c3 = Collectible(800, ALTO - 60, "coin")
-        self.collectibles.add(c1, c2, c3)
-        self.all_sprites.add(c1, c2, c3)
+        # Sistema de partículas
+        self.particle_system = ParticleSystem()
+
 
     def handle_events(self, events):
         for event in events:
@@ -375,10 +493,81 @@ class PlanetState(GameState):
         self.ground_enemies.update()
         self.collectibles.update()
         
+        # Partículas para balas
+        for b in self.balas:
+            self.particle_system.create_bullet_trail(b.rect.centerx, b.rect.centery)
+
+        self.particle_system.update()
+        
+        # --- Lógica de Supervivencia ---
+        
+        # 1. Timer
+        if self.timer_frames > 0:
+            self.timer_frames -= 1
+            
+            # Spawn Enemigos Continuo durante el tiempo
+            if random.random() < 0.015: # 1.5% chance por frame
+                 side = random.choice([0, ANCHO])
+                 offset = -50 if side == 0 else 50
+                 # Enemigo caminando hacia el centro
+                 e = GroundEnemy(side, ALTO - 40, range_x=ANCHO) 
+                 e.direction = 1 if side == 0 else -1
+                 self.ground_enemies.add(e)
+                 self.all_sprites.add(e)
+        
+        # 2. Spawn Boss al terminar tiempo
+        if self.timer_frames <= 0 and not self.boss and not self.boss_defeated:
+             # Spawn Boss
+             self.boss = Boss(ANCHO - 150, ALTO // 2)
+             self.all_sprites.add(self.boss)
+             
+        # Boss Logic
+        if self.boss:
+            self.boss.update()
+            # Boss shot
+            bala_boss = self.boss.try_shoot()
+            if bala_boss:
+                self.balas_boss.add(bala_boss)
+                self.all_sprites.add(bala_boss)
+            
+            # Colisiones: Balas Jugador vs Boss
+            hits_boss = pygame.sprite.spritecollide(self.boss, self.balas, True)
+            if hits_boss:
+                sound_manager.play('explosion')
+                for b in hits_boss:
+                    self.particle_system.create_explosion(b.rect.centerx, b.rect.centery)
+                    self.boss.health -= 10 # Daño por bala
+                    
+                if self.boss.health <= 0:
+                    # Boss Defeated
+                    self.boss.kill()
+                    self.boss = None
+                    self.boss_defeated = True
+                    contexto.puntuacion += 1000
+                    
+            # Colisiones: Balas Boss vs Jugador
+            if pygame.sprite.spritecollide(self.piloto, self.balas_boss, True):
+                contexto.salud -= 20
+                if contexto.salud <= 0:
+                    self.next_state = GameOverState(self.game)
+                    
+            # Colisiones: Boss vs Jugador (Contacto)
+            if pygame.sprite.collide_rect(self.piloto, self.boss):
+                contexto.salud -= 5
+                # Pushback
+                self.piloto.rect.x -= 30
+                if contexto.salud <= 0:
+                     self.next_state = GameOverState(self.game)
+                     
+        self.balas_boss.update()
+
         # Colisiones: Balas vs Enemigos
         hits_enemies = pygame.sprite.groupcollide(self.ground_enemies, self.balas, True, True)
         if hits_enemies:
              sound_manager.play('explosion')
+             # Crear explosion para cada enemigo muerto
+             for enemy in hits_enemies.keys():
+                 self.particle_system.create_explosion(enemy.rect.centerx, enemy.rect.centery, color=(200, 50, 50))
              contexto.puntuacion += 50
              
         # Colisiones: Jugador vs Enemigos
@@ -395,13 +584,15 @@ class PlanetState(GameState):
         hits_colex = pygame.sprite.spritecollide(self.piloto, self.collectibles, True)
         for c in hits_colex:
             sound_manager.play('collect')
+            self.particle_system.create_sparkle(c.rect.centerx, c.rect.centery, color=(255, 255, 0))
             if c.type == "coin":
                 contexto.puntuacion += 100
             elif c.type == "health":
                 contexto.salud = min(100, contexto.salud + 20)
         
-        # Simular enemigos o condiciones de victoria aquí
-        if self.piloto.rect.right >= ANCHO:
+        # Condición de victoria real: Boss derrotado y caminar a la derecha
+        # Una vez derrotado el boss, permitimos salir por la derecha
+        if self.boss_defeated and self.piloto.rect.right >= ANCHO:
             self.next_state = WinState(self.game)
 
         # Condición de muerte (caer al vacío)
@@ -410,7 +601,9 @@ class PlanetState(GameState):
         
     def draw(self, screen):
         screen.fill(self.bg_color)
+        self.particle_system.draw(screen)
         self.all_sprites.draw(screen)
+        self.balas_boss.draw(screen) # Dibujar balas del boss
         
         # HUD - Barra de Vida
         pygame.draw.rect(screen, ROJO, (10, 10, 200, 20)) # Barra fondo
@@ -421,6 +614,23 @@ class PlanetState(GameState):
         font = pygame.font.SysFont("Arial", 20)
         texto_vidas = font.render(f"Vidas: {contexto.vidas} | Planeta: {contexto.planeta_actual}", True, BLANCO)
         screen.blit(texto_vidas, (10, 40))
+        
+        # HUD - Timer Supervivencia
+        if self.timer_frames > 0:
+            mins = int((self.timer_frames / FPS) // 60)
+            secs = int((self.timer_frames / FPS) % 60)
+            txt_timer = font.render(f"OLADA FINAL EN: {mins:02}:{secs:02}", True, AMARILLO)
+            screen.blit(txt_timer, (ANCHO//2 - txt_timer.get_width()//2, 20))
+        elif not self.boss_defeated and self.boss:
+            txt_boss = font.render("¡DERROTA AL JEFE!", True, ROJO)
+            screen.blit(txt_boss, (ANCHO//2 - txt_boss.get_width()//2, 20))
+        elif self.boss_defeated:
+             txt_win = font.render("¡JEFE DERROTADO! ESCAPA ->", True, VERDE)
+             screen.blit(txt_win, (ANCHO//2 - txt_win.get_width()//2, 20))
+        
+        # Draw Boss Health
+        if self.boss:
+            self.boss.draw_health(screen)
 
 class GameOverState(GameState):
     def __init__(self, game):

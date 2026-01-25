@@ -1,6 +1,7 @@
 import pygame
 import random
 from shared_data import *
+from entities import Bala
 
 class SpaceEnemy(pygame.sprite.Sprite):
     def __init__(self):
@@ -59,3 +60,63 @@ class GroundEnemy(pygame.sprite.Sprite):
             self.direction = -1
         elif self.rect.x < self.start_x:
             self.direction = 1
+
+class Boss(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        # Intentar cargar imagen o usar un rectángulo grande
+        try:
+            self.image = pygame.image.load("assets/boss.png")
+            self.image = pygame.transform.scale(self.image, (100, 100))
+            self.image.set_colorkey(NEGRO)
+        except:
+            self.image = pygame.Surface((100, 100))
+            self.image.fill((100, 0, 100)) # Violeta oscuro
+            # Ojos amenazantes
+            pygame.draw.rect(self.image, ROJO, (20, 30, 20, 10))
+            pygame.draw.rect(self.image, ROJO, (60, 30, 20, 10))
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        
+        self.speed_y = 2
+        self.direction_y = 1
+        self.health = 500 # Mucha vida
+        self.max_health = 500
+        self.last_shot = pygame.time.get_ticks()
+        self.shoot_delay = 1500 # Dispara cada 1.5 segundos
+
+    def update(self):
+        # Movimiento vertical (flotar)
+        self.rect.y += self.speed_y * self.direction_y
+        
+        if self.rect.top < 50 or self.rect.bottom > ALTO - 50:
+            self.direction_y *= -1
+            
+    def try_shoot(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_shot > self.shoot_delay:
+            self.last_shot = now
+            # Disparar hacia la izquierda (asumiendo que el jugador viene de la izquierda)
+            return Bala(self.rect.centerx, self.rect.centery, direction_x=-8, direction_y=0, color=(255, 0, 255))
+        return None
+
+    def draw_health(self, screen):
+        # Barra de vida del jefe en la parte superior
+        width = 400
+        height = 20
+        x = (ANCHO - width) // 2
+        y = 50
+        
+        # Fondo
+        pygame.draw.rect(screen, NEGRO, (x, y, width, height))
+        # Vida actual
+        fill_width = (self.health / self.max_health) * width
+        pygame.draw.rect(screen, ROJO, (x, y, fill_width, height))
+        # Borde
+        pygame.draw.rect(screen, BLANCO, (x, y, width, height), 2)
+        
+        font = pygame.font.SysFont("Arial", 16)
+        text = font.render("JEFE PLANETARIO", True, BLANCO)
+        screen.blit(text, (x + width//2 - text.get_width()//2, y - 20))
