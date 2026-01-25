@@ -8,6 +8,7 @@ class SpaceEnemy(pygame.sprite.Sprite):
         try:
             self.image = pygame.image.load("assets/enemy_space.png")
             self.image = pygame.transform.scale(self.image, (30, 30))
+            self.image.set_colorkey(NEGRO)
         except:
             self.image = pygame.Surface((30, 30))
             self.image.fill(ROJO)
@@ -36,6 +37,7 @@ class GroundEnemy(pygame.sprite.Sprite):
         try:
              self.image = pygame.image.load("assets/enemy_ground.png")
              self.image = pygame.transform.scale(self.image, (30, 30))
+             self.image.set_colorkey(NEGRO)
         except:
             self.image = pygame.Surface((30, 30))
             self.image.fill((200, 50, 50)) # Rojo oscuro

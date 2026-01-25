@@ -33,6 +33,7 @@ class Nave(pygame.sprite.Sprite):
             
             self.image = pygame.image.load(f"assets/{fname}")
             self.image = pygame.transform.scale(self.image, (40, 50))
+            self.image.set_colorkey(NEGRO) # Eliminar fondo negro
         except:
              self.image = pygame.Surface((40, 50))
              self.image.fill(AZUL) 
