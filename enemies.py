@@ -5,11 +5,13 @@ from shared_data import *
 class SpaceEnemy(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = pygame.Surface((30, 30))
-        self.image.fill(ROJO)
-        # Dibujar algo para que parezca nave enemiga
-        pygame.draw.circle(self.image, (200, 0, 0), (15, 15), 10)
-        
+        try:
+            self.image = pygame.image.load("assets/enemy_space.png")
+            self.image = pygame.transform.scale(self.image, (30, 30))
+        except:
+            self.image = pygame.Surface((30, 30))
+            self.image.fill(ROJO)
+            
         self.rect = self.image.get_rect()
         self.rect.x = random.randrange(0, ANCHO - self.rect.width)
         self.rect.y = random.randrange(-100, -40)
@@ -27,3 +29,31 @@ class SpaceEnemy(pygame.sprite.Sprite):
         # Eliminar si sale por abajo
         if self.rect.top > ALTO:
             self.kill()
+
+class GroundEnemy(pygame.sprite.Sprite):
+    def __init__(self, x, y, range_x=100):
+        super().__init__()
+        try:
+             self.image = pygame.image.load("assets/enemy_ground.png")
+             self.image = pygame.transform.scale(self.image, (30, 30))
+        except:
+            self.image = pygame.Surface((30, 30))
+            self.image.fill((200, 50, 50)) # Rojo oscuro
+        
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.bottom = y
+        
+        self.start_x = x
+        self.range_x = range_x
+        self.speed = 2
+        self.direction = 1 # 1 derecha, -1 izquierda
+
+    def update(self):
+        self.rect.x += self.speed * self.direction
+        
+        # Patrullar rango
+        if self.rect.x > self.start_x + self.range_x:
+            self.direction = -1
+        elif self.rect.x < self.start_x:
+            self.direction = 1

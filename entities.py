@@ -25,9 +25,18 @@ class Bala(pygame.sprite.Sprite):
 class Nave(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        # Placeholder visual hasta cargar imagenes reales
-        self.image = pygame.Surface((40, 50))
-        self.image.fill(AZUL) 
+        try:
+            # Seleccionar imagen según tipo
+            if contexto.ship_type == "rapid": fname = "nave_rapid.png"
+            elif contexto.ship_type == "heavy": fname = "nave_heavy.png"
+            else: fname = "nave_balanced.png"
+            
+            self.image = pygame.image.load(f"assets/{fname}")
+            self.image = pygame.transform.scale(self.image, (40, 50))
+        except:
+             self.image = pygame.Surface((40, 50))
+             self.image.fill(AZUL) 
+        
         self.rect = self.image.get_rect()
         self.rect.centerx = ANCHO // 2
         self.rect.bottom = ALTO - 10
@@ -40,14 +49,23 @@ class Nave(pygame.sprite.Sprite):
         teclas = pygame.key.get_pressed()
         
         # Movimiento libre en modo espacio
+        # Factor de nivel: +10% velocidad por nivel
+        level_mult = 1 + (contexto.ship_level - 1) * 0.1
+        
+        base_speed = 6
+        if contexto.ship_type == "rapid": base_speed = 9
+        elif contexto.ship_type == "heavy": base_speed = 4
+        
+        speed = base_speed * level_mult
+
         if teclas[pygame.K_LEFT]:
-            self.velocidad_x = -6
+            self.velocidad_x = -speed
         if teclas[pygame.K_RIGHT]:
-            self.velocidad_x = 6
+            self.velocidad_x = speed
         if teclas[pygame.K_UP]:
-            self.velocidad_y = -6
+            self.velocidad_y = -speed
         if teclas[pygame.K_DOWN]:
-            self.velocidad_y = 6
+            self.velocidad_y = speed
         
         self.rect.x += self.velocidad_x
         self.rect.y += self.velocidad_y
@@ -103,6 +121,7 @@ class Piloto(pygame.sprite.Sprite):
             
         # 2. Salto
         if teclas[pygame.K_SPACE] and self.en_suelo:
+            sound_manager.play('jump')
             self.velocidad_y = -15
             self.en_suelo = False
             
@@ -129,10 +148,29 @@ class Piloto(pygame.sprite.Sprite):
             self.rect.y = 0 # Caída al vacío (temporal)
 
 class Plataforma(pygame.sprite.Sprite):
-    def __init__(self, x, y, w, h):
+    def __init__(self, x, y, w, h, color=(150, 150, 150)):
         super().__init__()
         self.image = pygame.Surface((w, h))
-        self.image.fill((150, 150, 150)) # Gris
+        self.image.fill(color)
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+
+class Collectible(pygame.sprite.Sprite):
+    def __init__(self, x, y, type="coin"):
+        super().__init__()
+        self.type = type
+        self.image = pygame.Surface((20, 20))
+        if type == "coin":
+            self.image.fill(AMARILLO)
+            pygame.draw.circle(self.image, (255, 215, 0), (10, 10), 8)
+        elif type == "health":
+            self.image.fill(VERDE)
+            pygame.draw.cross(self.image, BLANCO, (10, 10), 10, 4)
+            
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.centery = y
+        
+    def update(self):
+        pass # Podría tener animación simple aquí
