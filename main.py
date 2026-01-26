@@ -6,7 +6,7 @@ class Game:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((ANCHO, ALTO))
-        pygame.display.set_caption("Didi x el espacio")
+        pygame.display.set_caption(f"Didi x el espacio v{VERSION}")
         self.clock = pygame.time.Clock()
         self.running = True
         

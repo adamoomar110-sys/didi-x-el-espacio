@@ -5,6 +5,7 @@ import pygame
 ANCHO = 800
 ALTO = 600
 FPS = 60
+VERSION = "1.5"
 
 # Colores
 NEGRO = (0, 0, 0)
