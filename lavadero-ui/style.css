@@ -444,6 +444,7 @@ body {
     font-size: 1rem;
     color: rgba(255,255,255,0.3);
     z-index: 1000;
+}
 .main-footer { pointer-events: none; }
 #toggle-view-btn { pointer-events: auto; }
 body.public-mode .item-plate,
